@@ -14,10 +14,10 @@ static const char INITFINGER[] = "cob_hand_bridge/InitFinger";
   {
     public:
       const char* port;
-      uint16_t min_pwm0;
-      uint16_t min_pwm1;
-      uint16_t max_pwm0;
-      uint16_t max_pwm1;
+      int16_t min_pwm0;
+      int16_t min_pwm1;
+      int16_t max_pwm0;
+      int16_t max_pwm1;
 
     InitFingerRequest():
       port(""),
@@ -36,17 +36,37 @@ static const char INITFINGER[] = "cob_hand_bridge/InitFinger";
       offset += 4;
       memcpy(outbuffer + offset, this->port, length_port);
       offset += length_port;
-      *(outbuffer + offset + 0) = (this->min_pwm0 >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->min_pwm0 >> (8 * 1)) & 0xFF;
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_min_pwm0;
+      u_min_pwm0.real = this->min_pwm0;
+      *(outbuffer + offset + 0) = (u_min_pwm0.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_min_pwm0.base >> (8 * 1)) & 0xFF;
       offset += sizeof(this->min_pwm0);
-      *(outbuffer + offset + 0) = (this->min_pwm1 >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->min_pwm1 >> (8 * 1)) & 0xFF;
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_min_pwm1;
+      u_min_pwm1.real = this->min_pwm1;
+      *(outbuffer + offset + 0) = (u_min_pwm1.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_min_pwm1.base >> (8 * 1)) & 0xFF;
       offset += sizeof(this->min_pwm1);
-      *(outbuffer + offset + 0) = (this->max_pwm0 >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->max_pwm0 >> (8 * 1)) & 0xFF;
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_max_pwm0;
+      u_max_pwm0.real = this->max_pwm0;
+      *(outbuffer + offset + 0) = (u_max_pwm0.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_max_pwm0.base >> (8 * 1)) & 0xFF;
       offset += sizeof(this->max_pwm0);
-      *(outbuffer + offset + 0) = (this->max_pwm1 >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->max_pwm1 >> (8 * 1)) & 0xFF;
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_max_pwm1;
+      u_max_pwm1.real = this->max_pwm1;
+      *(outbuffer + offset + 0) = (u_max_pwm1.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_max_pwm1.base >> (8 * 1)) & 0xFF;
       offset += sizeof(this->max_pwm1);
       return offset;
     }
@@ -63,23 +83,47 @@ static const char INITFINGER[] = "cob_hand_bridge/InitFinger";
       inbuffer[offset+length_port-1]=0;
       this->port = (char *)(inbuffer + offset-1);
       offset += length_port;
-      this->min_pwm0 =  ((uint16_t) (*(inbuffer + offset)));
-      this->min_pwm0 |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_min_pwm0;
+      u_min_pwm0.base = 0;
+      u_min_pwm0.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_min_pwm0.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->min_pwm0 = u_min_pwm0.real;
       offset += sizeof(this->min_pwm0);
-      this->min_pwm1 =  ((uint16_t) (*(inbuffer + offset)));
-      this->min_pwm1 |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_min_pwm1;
+      u_min_pwm1.base = 0;
+      u_min_pwm1.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_min_pwm1.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->min_pwm1 = u_min_pwm1.real;
       offset += sizeof(this->min_pwm1);
-      this->max_pwm0 =  ((uint16_t) (*(inbuffer + offset)));
-      this->max_pwm0 |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_max_pwm0;
+      u_max_pwm0.base = 0;
+      u_max_pwm0.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_max_pwm0.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->max_pwm0 = u_max_pwm0.real;
       offset += sizeof(this->max_pwm0);
-      this->max_pwm1 =  ((uint16_t) (*(inbuffer + offset)));
-      this->max_pwm1 |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_max_pwm1;
+      u_max_pwm1.base = 0;
+      u_max_pwm1.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_max_pwm1.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->max_pwm1 = u_max_pwm1.real;
       offset += sizeof(this->max_pwm1);
      return offset;
     }
 
     const char * getType(){ return INITFINGER; };
-    const char * getMD5(){ return "4b3d29c9d84d56c826054700c9f79709"; };
+    const char * getMD5(){ return "eb9952475d78dabda515be178e3c9292"; };
 
   };
 

@@ -1,16 +1,39 @@
 #include <ros/node_handle.h>
 
+#include <cob_hand_bridge/InitFinger.h>
 #include <cob_hand_bridge/InitPins.h>
 #include <cob_hand_bridge/UpdatePins.h>
 #include <cob_hand_bridge/Status.h>
 #include <std_msgs/UInt8.h>
+#include <std_srvs/Trigger.h>
 
 #include <boost/thread/thread.hpp>
 
 #include "hardware.h"
 #include "gpio.h"
+#include "sdhx.h"
 
 ros::NodeHandle_<HandBridgeHardware> g_nh;
+
+// SDHX
+SDHX g_sdhx;
+
+using cob_hand_bridge::InitFinger;
+void handleInitFinger(const InitFinger::Request & req, InitFinger::Response & res){
+    res.success = g_sdhx.init(req.port, req.min_pwm0, req.min_pwm1, req.max_pwm0, req.max_pwm1);
+}
+ros::ServiceServer<InitFinger::Request, InitFinger::Response> g_srv_init_finger("init_finger",&handleInitFinger);
+
+using std_srvs::Trigger;
+void handleHaltFinger(const Trigger::Request & req, Trigger::Response & res){
+    res.success = g_sdhx.halt();
+}
+ros::ServiceServer<Trigger::Request, Trigger::Response> g_srv_halt_finger("halt",&handleHaltFinger);
+
+void handleJointCommand(const cob_hand_bridge::JointValues& j){
+    g_sdhx.move(j.position_cdeg, j.velocity_cgeg, j.current_100uA);
+}
+ros::Subscriber<cob_hand_bridge::JointValues> g_sub_command("command", handleJointCommand );
 
 // GPIO
 GPIO g_gpio;
@@ -56,19 +79,29 @@ void step(){
     g_status_msg.status = g_status_msg.NOT_INITIALIZED;
     if(g_gpio.isInitialized()) g_status_msg.status |= g_status_msg.MASK_GPIO_READY;
 
+    cob_hand_bridge::JointValues &j= g_status_msg.joints;
+
+    if(g_sdhx.isInitialized()){
+        if(g_sdhx.getData(j.position_cdeg, j.velocity_cgeg, j.current_100uA, boost::chrono::seconds(1))) g_status_msg.status |= g_status_msg.MASK_FINGER_READY;
+        else g_status_msg.status |= g_status_msg.MASK_ERROR;
+        g_status_msg.rc = g_sdhx.getRC();
+    }
+
     g_status_msg.pins = g_gpio.getState();
     g_pub.publish( &g_status_msg );
     g_nh.spinOnce();
+
+    g_sdhx.poll();
 
     ++g_status_msg.seq;
 }
 
 int main(int argc, char** argv){
 
-    double rate = 50;
+    double rate = 20;
 
-    if(argc != 2 || argc != 3){
-        std::cerr << "Usage: " << argv[0] << "port@baud [looprate]" << std::endl;
+    if(argc != 2 && argc != 3){
+        std::cerr << "Usage: " << argv[0] << " port@baud [looprate]" << std::endl;
         exit(1);
     }
     if(argc == 3){
@@ -79,12 +112,18 @@ int main(int argc, char** argv){
         }
     }
 
-    g_nh.initNode(argv[1]);
+    std::string dev(argv[1]);
+    g_nh.initNode(&dev[0]);
+
+    g_nh.advertiseService(g_srv_init_finger);
+    g_nh.advertiseService(g_srv_halt_finger);
+    g_nh.subscribe(g_sub_command);
 
     g_nh.advertiseService(g_srv_init_pins);
     g_nh.advertiseService(g_srv_update_pins);
     g_nh.subscribe(g_sub_clear_pin);
     g_nh.subscribe(g_sub_set_pin);
+
     g_nh.advertise(g_pub);
 
     boost::chrono::duration<double> double_interval(1.0/rate);

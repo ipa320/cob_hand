@@ -1,7 +1,7 @@
 string port
-uint16 min_pwm0
-uint16 min_pwm1
-uint16 max_pwm0
-uint16 max_pwm1
+int16 min_pwm0
+int16 min_pwm1
+int16 max_pwm0
+int16 max_pwm1
 ---
 bool success
