@@ -5,20 +5,19 @@
 
 class GPIO {
     bool initialized;
-    uint32_t pin_mask0, pin_mask1;
+    uint32_t out_mask0;
     bool call(int (*func)(uint32_t), uint32_t mask, uint32_t pins){
         return initialized && (pins & mask) == pins && (pins == 0 || func(pins) == 0);
     }
 public:
-    GPIO() : initialized(false), pin_mask0(0), pin_mask1(0) {}
+    GPIO() : initialized(false), out_mask0(0) {}
     bool isInitialized() const { return initialized; }
     bool setInput(uint32_t pin) {
         return initialized && gpioSetMode(pin, PI_INPUT) == 0;
     }
     bool setOutput(uint32_t pin) {
         if(initialized && gpioSetMode(pin, PI_OUTPUT) == 0){
-            if(pin < 32) pin_mask0 |= (1<<pin);
-            else pin_mask1 |= (1<<(pin-32));
+            if(pin < 32) out_mask0 |= (1<<pin);
             return true;
         }
         return false;
@@ -26,28 +25,31 @@ public:
     bool init(){
         return initialized = gpioInitialise() >= 0;
     }
-    bool clearPins0(uint32_t pins){
-        return call(gpioWrite_Bits_0_31_Clear, pin_mask0, pins);
+    bool clearPins(uint32_t pins){
+        return call(gpioWrite_Bits_0_31_Clear, out_mask0, pins);
     }
-    bool setPins0(uint32_t pins){
-        return call(gpioWrite_Bits_0_31_Set, pin_mask0, pins);
-    }
-    bool clearPins1(uint32_t pins){
-        return call(gpioWrite_Bits_32_53_Clear, pin_mask1, pins);
-    }
-    bool setPins1(uint32_t pins){
-        return call(gpioWrite_Bits_32_53_Set, pin_mask1, pins);
+    bool setPins(uint32_t pins){
+        return call(gpioWrite_Bits_0_31_Set, out_mask0, pins);
     }
     bool writePin(uint32_t pin, uint32_t level) {
-        if(pin < 32 && ((1 << pin) & pin_mask0) != (1<<pin)) return false;
-        if(pin >= 32 && ((1 << (pin-32)) & pin_mask1) != (1<<(pin-32))) return false;
+        if(!initialized) return false;
+        if(pin < 32 &&  ((1<<pin) & out_mask0) != (1<<pin)) return false;
+
         return gpioWrite(pin, level ? 1 : 0) == 0;
     }
-    uint32_t getState0() {
-        return initialized ? gpioRead_Bits_0_31(): 0;
+    bool pwmPin(uint32_t pin, float level) {
+        if(!initialized) return false;
+        if(pin < 32 &&  ((1<<pin) & out_mask0) != (1<<pin)) return false;
+
+        int range;
+        if ((range = gpioGetPWMrange(pin)) < 0) return false;
+
+        if(level < 0 || level > 1.0) return false;
+
+        return gpioPWM(pin, level* range) == 0;
     }
-    uint32_t getState1() {
-        return initialized ? gpioRead_Bits_32_53(): 0;
+    uint32_t getState() {
+        return initialized ? gpioRead_Bits_0_31(): 0;
     }
 };
 #endif // HAND_BRIDGE_GPIO_H_

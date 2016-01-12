@@ -2,6 +2,7 @@
 
 #include <cob_hand_bridge/InitFinger.h>
 #include <cob_hand_bridge/InitPins.h>
+#include <cob_hand_bridge/SetPWM.h>
 #include <cob_hand_bridge/UpdatePins.h>
 #include <cob_hand_bridge/Status.h>
 #include <std_msgs/UInt8.h>
@@ -55,8 +56,8 @@ ros::ServiceServer<InitPins::Request, InitPins::Response> g_srv_init_pins("init_
 
 using cob_hand_bridge::UpdatePins;
 void handleUpdatePins(const UpdatePins::Request & req, UpdatePins::Response & res){
-    res.success = g_gpio.setPins0(req.set_pins) | g_gpio.clearPins0(req.clear_pins);
-    uint32_t state = g_gpio.getState0();
+    res.success = g_gpio.setPins(req.set_pins) | g_gpio.clearPins(req.clear_pins);
+    uint32_t state = g_gpio.getState();
     res.success = res.success && (state & req.set_pins) == req.set_pins && (state & req.clear_pins) == 0;
 }
 ros::ServiceServer<UpdatePins::Request, UpdatePins::Response> g_srv_update_pins("update_pins",&handleUpdatePins);
@@ -74,6 +75,22 @@ ros::Subscriber<std_msgs::UInt8> g_sub_set_pin("set_pin", handleSetPin );
 cob_hand_bridge::Status g_status_msg;
 ros::Publisher g_pub("status", &g_status_msg);
 
+using cob_hand_bridge::SetPWM;
+
+void handleSetPWM(const SetPWM::Request & req, SetPWM::Response & res){
+
+    if(req.pins_length != req.levels_length){
+        res.success = false;
+        return;
+    }
+    res.success = true;
+
+    for(size_t i = 0; i < req.pins_length; ++i)
+        if(!g_gpio.pwmPin(req.pins[i],req.levels[i]))
+            res.success = false;
+}
+ros::ServiceServer<SetPWM::Request, SetPWM::Response> g_srv_set_pwm("set_pwm",&handleSetPWM);
+
 void step(){
     g_status_msg.stamp = g_nh.now();
 
@@ -88,8 +105,7 @@ void step(){
         g_status_msg.rc = g_sdhx.getRC();
     }
 
-    g_status_msg.pins[0] = g_gpio.getState0();
-    g_status_msg.pins[1] = g_gpio.getState1();
+    g_status_msg.pins = g_gpio.getState();
 
     g_pub.publish( &g_status_msg );
     g_nh.spinOnce();
@@ -123,6 +139,7 @@ int main(int argc, char** argv){
     g_nh.subscribe(g_sub_command);
 
     g_nh.advertiseService(g_srv_init_pins);
+    g_nh.advertiseService(g_srv_set_pwm);
     g_nh.advertiseService(g_srv_update_pins);
     g_nh.subscribe(g_sub_clear_pin);
     g_nh.subscribe(g_sub_set_pin);

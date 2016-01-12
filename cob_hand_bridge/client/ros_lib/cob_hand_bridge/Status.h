@@ -18,7 +18,7 @@ namespace cob_hand_bridge
       ros::Time stamp;
       uint8_t status;
       uint8_t rc;
-      uint32_t pins[2];
+      uint32_t pins;
       cob_hand_bridge::JointValues joints;
       enum { NOT_INITIALIZED = 0 };
       enum { MASK_FINGER_READY = 1 };
@@ -31,7 +31,7 @@ namespace cob_hand_bridge
       stamp(),
       status(0),
       rc(0),
-      pins(),
+      pins(0),
       joints()
     {
     }
@@ -58,13 +58,11 @@ namespace cob_hand_bridge
       offset += sizeof(this->status);
       *(outbuffer + offset + 0) = (this->rc >> (8 * 0)) & 0xFF;
       offset += sizeof(this->rc);
-      for( uint8_t i = 0; i < 2; i++){
-      *(outbuffer + offset + 0) = (this->pins[i] >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->pins[i] >> (8 * 1)) & 0xFF;
-      *(outbuffer + offset + 2) = (this->pins[i] >> (8 * 2)) & 0xFF;
-      *(outbuffer + offset + 3) = (this->pins[i] >> (8 * 3)) & 0xFF;
-      offset += sizeof(this->pins[i]);
-      }
+      *(outbuffer + offset + 0) = (this->pins >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (this->pins >> (8 * 1)) & 0xFF;
+      *(outbuffer + offset + 2) = (this->pins >> (8 * 2)) & 0xFF;
+      *(outbuffer + offset + 3) = (this->pins >> (8 * 3)) & 0xFF;
+      offset += sizeof(this->pins);
       offset += this->joints.serialize(outbuffer + offset);
       return offset;
     }
@@ -91,19 +89,17 @@ namespace cob_hand_bridge
       offset += sizeof(this->status);
       this->rc =  ((uint8_t) (*(inbuffer + offset)));
       offset += sizeof(this->rc);
-      for( uint8_t i = 0; i < 2; i++){
-      this->pins[i] =  ((uint32_t) (*(inbuffer + offset)));
-      this->pins[i] |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1);
-      this->pins[i] |= ((uint32_t) (*(inbuffer + offset + 2))) << (8 * 2);
-      this->pins[i] |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
-      offset += sizeof(this->pins[i]);
-      }
+      this->pins =  ((uint32_t) (*(inbuffer + offset)));
+      this->pins |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->pins |= ((uint32_t) (*(inbuffer + offset + 2))) << (8 * 2);
+      this->pins |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
+      offset += sizeof(this->pins);
       offset += this->joints.deserialize(inbuffer + offset);
      return offset;
     }
 
     const char * getType(){ return "cob_hand_bridge/Status"; };
-    const char * getMD5(){ return "46ba6f6e56c845a9945c11520e5ea8e4"; };
+    const char * getMD5(){ return "277b687432134b0fceb8a550de102ce0"; };
 
   };
 

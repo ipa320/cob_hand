@@ -10,6 +10,6 @@ uint8 status
 uint8 RC_OK=0
 uint8 rc
 
-uint32[2] pins
+uint32 pins
 
 JointValues joints

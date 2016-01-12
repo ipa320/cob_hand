@@ -18,6 +18,7 @@ add_service_files(
   FILES
   InitFinger.srv
   InitPins.srv
+  SetPWM.srv
   UpdatePins.srv
 )
 
