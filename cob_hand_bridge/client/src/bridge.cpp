@@ -39,6 +39,7 @@ ros::Subscriber<cob_hand_bridge::JointValues> g_sub_command("command", handleJoi
 GPIO g_gpio;
 
 using cob_hand_bridge::InitPins;
+
 void handleInitPins(const InitPins::Request & req, InitPins::Response & res){
     res.success = g_gpio.init();
 
@@ -54,19 +55,19 @@ ros::ServiceServer<InitPins::Request, InitPins::Response> g_srv_init_pins("init_
 
 using cob_hand_bridge::UpdatePins;
 void handleUpdatePins(const UpdatePins::Request & req, UpdatePins::Response & res){
-    res.success = g_gpio.setPins(req.set_pins) | g_gpio.clearPins(req.clear_pins);
-    uint32_t state = g_gpio.getState();
+    res.success = g_gpio.setPins0(req.set_pins) | g_gpio.clearPins0(req.clear_pins);
+    uint32_t state = g_gpio.getState0();
     res.success = res.success && (state & req.set_pins) == req.set_pins && (state & req.clear_pins) == 0;
 }
 ros::ServiceServer<UpdatePins::Request, UpdatePins::Response> g_srv_update_pins("update_pins",&handleUpdatePins);
 
 void handleClearPin(const std_msgs::UInt8& mgs){
-    if(mgs.data < 32) g_gpio.clearPins(1<<mgs.data);
+    g_gpio.writePin(mgs.data, 0);
 }
 ros::Subscriber<std_msgs::UInt8> g_sub_clear_pin("clear_pin", handleClearPin );
 
 void handleSetPin(const std_msgs::UInt8& mgs){
-    if(mgs.data < 32) g_gpio.setPins(1<<mgs.data);
+    g_gpio.writePin(mgs.data, 1);
 }
 ros::Subscriber<std_msgs::UInt8> g_sub_set_pin("set_pin", handleSetPin );
 
@@ -87,7 +88,9 @@ void step(){
         g_status_msg.rc = g_sdhx.getRC();
     }
 
-    g_status_msg.pins = g_gpio.getState();
+    g_status_msg.pins[0] = g_gpio.getState0();
+    g_status_msg.pins[1] = g_gpio.getState1();
+
     g_pub.publish( &g_status_msg );
     g_nh.spinOnce();
 
