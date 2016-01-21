@@ -39,7 +39,7 @@ public:
     }
     bool pwmPin(uint32_t pin, float level) {
         if(!initialized) return false;
-        if(pin < 32 &&  ((1<<pin) & out_mask0) != (1<<pin)) return false;
+        if(pin >= 32 ||  ((1<<pin) & out_mask0) != (1<<pin)) return false;
 
         int range;
         if ((range = gpioGetPWMrange(pin)) < 0) return false;
