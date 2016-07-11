@@ -79,7 +79,7 @@ class SDHX {
     }
 
     bool setPWM(const int16_t &val, const char *format) {
-        return send(boost::str(boost::format(format) % val));
+        return val == 0 || send(boost::str(boost::format(format) % val));
     }
 
     int16_t pos[2], vel[2];
