@@ -15,31 +15,20 @@ class SDHX {
     boost::chrono::steady_clock::time_point last_time;
 
     void doRead(){
-        std::string buffer;
-        buffer.reserve(1024);
+        const size_t MAX_LINE = 1024;
 
-        char chunk[129]; // extra byte for termination
+        char buffer[MAX_LINE+1] = {0}; // extra byte for termination
 
-        int a = 0, r = 1;
+        int a = 0, r = 1, offset = 0;
         while(a >= 0 && r > 0){
-            if((a = serial.waitData(boost::chrono::milliseconds(1))) > 0 &&  (r = serial.read(chunk, 128)) > 0){
-                char * extra = strchr(chunk, '\n');
-
-
-                if(!extra){
-                    buffer.append(chunk, r);
-                    continue;
+            if((a = serial.waitData(boost::chrono::milliseconds(1))) > 0 &&  (r = serial.read(buffer+offset, MAX_LINE-offset)) > 0){
+                char * line = buffer;
+                while(char * extra = strchr(line, '\n')){
+                    tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hu,%hu");
+                    line = extra+1;
                 }
-
-                extra+=1; // inlude \n
-
-                int span = extra - chunk;;
-                buffer.append(chunk, span);
-
-                tryParseRC(buffer) || tryReadValues(buffer, pos, "P=%hd,%hd", true) || tryReadValues(buffer, vel, "V=%hd,%hd") || tryReadValues(buffer, cur, "C=%hu,%hu");
-
-                buffer.assign(extra, r - span);
-
+                offset = line-buffer;
+                strncpy(buffer, line, offset);
             }
         }
         std::cerr << "stopped reading" << std::endl;
@@ -47,9 +36,9 @@ class SDHX {
         reading = false;
     }
 
-    bool tryParseRC(const std::string &buffer){
+    bool tryParseRC(const char *line){
         uint8_t res;
-        if(sscanf(buffer.c_str(), "rc=%hhx", &res) == 1){
+        if(sscanf(line, "rc=%hhx", &res) == 1){
             if(res != 0){
                 boost::mutex::scoped_lock lock(data_mutex);
                 rc = res;
@@ -58,9 +47,9 @@ class SDHX {
         }
         return false;
     }
-    template<typename T> bool tryReadValues(const std::string &buffer, T (&val)[2], const char *format, bool track_time = false) {
+    template<typename T> bool tryReadValues(const char *line, T (&val)[2], const char *format, bool track_time = false) {
         T val1,val2;
-        if(sscanf(buffer.c_str(), format, &val1, &val2) == 2){
+        if(sscanf(line, format, &val1, &val2) == 2){
             boost::mutex::scoped_lock lock(data_mutex);
             val[0] = val1;
             val[1] = val2;
@@ -73,7 +62,7 @@ class SDHX {
         return false;
     }
 
-   bool send(const std::string &command){
+    bool send(const std::string &command){
         boost::mutex::scoped_lock lock(send_mutex);
         return serial.write(command);
     }
