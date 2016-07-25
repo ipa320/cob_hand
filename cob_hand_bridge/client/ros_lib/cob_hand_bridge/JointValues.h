@@ -14,7 +14,7 @@ namespace cob_hand_bridge
     public:
       int16_t position_cdeg[2];
       int16_t velocity_cgeg[2];
-      uint16_t current_100uA[2];
+      int16_t current_100uA[2];
 
     JointValues():
       position_cdeg(),
@@ -47,8 +47,13 @@ namespace cob_hand_bridge
       offset += sizeof(this->velocity_cgeg[i]);
       }
       for( uint8_t i = 0; i < 2; i++){
-      *(outbuffer + offset + 0) = (this->current_100uA[i] >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (this->current_100uA[i] >> (8 * 1)) & 0xFF;
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_current_100uAi;
+      u_current_100uAi.real = this->current_100uA[i];
+      *(outbuffer + offset + 0) = (u_current_100uAi.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_current_100uAi.base >> (8 * 1)) & 0xFF;
       offset += sizeof(this->current_100uA[i]);
       }
       return offset;
@@ -80,8 +85,14 @@ namespace cob_hand_bridge
       offset += sizeof(this->velocity_cgeg[i]);
       }
       for( uint8_t i = 0; i < 2; i++){
-      this->current_100uA[i] =  ((uint16_t) (*(inbuffer + offset)));
-      this->current_100uA[i] |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      union {
+        int16_t real;
+        uint16_t base;
+      } u_current_100uAi;
+      u_current_100uAi.base = 0;
+      u_current_100uAi.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_current_100uAi.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->current_100uA[i] = u_current_100uAi.real;
       offset += sizeof(this->current_100uA[i]);
       }
      return offset;

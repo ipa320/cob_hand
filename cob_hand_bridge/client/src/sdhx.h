@@ -24,7 +24,7 @@ class SDHX {
             if((a = serial.waitData(boost::chrono::milliseconds(1))) > 0 &&  (r = serial.read(buffer+offset, MAX_LINE-offset)) > 0){
                 char * line = buffer;
                 while(char * extra = strchr(line, '\n')){
-                    tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hu,%hu");
+                    tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hd,%hd");
                     line = extra+1;
                 }
                 offset = line-buffer;
@@ -71,8 +71,7 @@ class SDHX {
         return val == 0 || send(boost::str(boost::format(format) % val));
     }
 
-    int16_t pos[2], vel[2];
-    uint16_t cur[2];
+    int16_t pos[2], vel[2], cur[2];
 public:
     SDHX() : rc(0), initialized(false), reading(false) {
     }
@@ -108,7 +107,7 @@ public:
         return initialized;
     }
 
-    template <typename Dur> bool getData(int16_t (&p)[2], int16_t (&v)[2], uint16_t (&c)[2], const Dur &max_age){
+    template <typename Dur> bool getData(int16_t (&p)[2], int16_t (&v)[2], int16_t (&c)[2], const Dur &max_age){
         boost::mutex::scoped_lock lock(data_mutex);
         if((boost::chrono::steady_clock::now() - last_time) > max_age) return false;
         if(!reading) return false;
@@ -128,11 +127,11 @@ public:
     bool halt(){
         return initialized && send("s\r\n");
     }
-    /*bool move(const int16_t (&p)[2], const int16_t (&v)[2], const uint16_t (&c)[2]){
+    /*bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
         static boost::format command("m %hd,%hd %hd,%hd %hu,%hu\r\n");
         return initialized && send(boost::str(command % p[0] % p[1] % v[0] % v[1] % c[0] % c[1]));
     }*/
-    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const uint16_t (&c)[2]){
+    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
         static boost::format command("m %hd,%hd\r\n");
         return initialized && send(boost::str(command % p[0] % p[1]));
     }
