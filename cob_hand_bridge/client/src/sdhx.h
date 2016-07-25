@@ -114,15 +114,15 @@ public:
 
         p[0] = pos[0];
         p[1] = pos[1];
-        /*v[0] = vel[0];
+        v[0] = vel[0];
         v[1] = vel[1];
         c[0] = cur[0];
-        c[1] = cur[1];*/
+        c[1] = cur[1];
 
         return true;
     }
     bool poll(){
-         return initialized && send("p\r\n");
+         return initialized && send("p;v;c\r\n");
     }
     bool halt(){
         return initialized && send("s\r\n");
