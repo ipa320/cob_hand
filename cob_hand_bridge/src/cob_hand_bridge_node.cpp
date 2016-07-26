@@ -39,7 +39,7 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     }
     
     if(msg->status & msg->MASK_FINGER_READY){
-        g_js.position.clear();
+        g_js.position.resize(msg->joints.position_cdeg.size());
         for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
             g_js.position[i] = angles::from_degrees(msg->joints.position_cdeg[i]/100.0);
         }
