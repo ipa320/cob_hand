@@ -5,8 +5,15 @@ project(cob_hand_bridge)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
+  angles
+  diagnostic_updater
   message_generation
+  sensor_msgs
+  std_srvs
 )
+
+find_package(Boost REQUIRED COMPONENTS thread)
 
 add_message_files(
   FILES
@@ -32,6 +39,18 @@ catkin_package(
   CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
+
+include_directories(
+  ${Boost_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+)
+
+add_executable(${PROJECT_NAME}_node src/cob_hand_bridge_node.cpp)
+target_link_libraries(${PROJECT_NAME}_node ${Boost_LIBRARIES} ${catkin_LIBRARIES})
+add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS})
+
+install(TARGETS ${PROJECT_NAME}_node
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
