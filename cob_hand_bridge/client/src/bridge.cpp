@@ -167,6 +167,7 @@ int main(int argc, char** argv){
 
     g_nh.advertiseService(g_srv_init_finger);
     g_nh.advertiseService(g_srv_halt_finger);
+    g_nh.advertiseService(g_srv_recover);
     g_nh.subscribe(g_sub_command);
 
     g_nh.advertiseService(g_srv_init_pins);
