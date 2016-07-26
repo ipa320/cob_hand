@@ -99,7 +99,7 @@ namespace cob_hand_bridge
     }
 
     const char * getType(){ return "cob_hand_bridge/Status"; };
-    const char * getMD5(){ return "277b687432134b0fceb8a550de102ce0"; };
+    const char * getMD5(){ return "77bfa88d4950f9efb75870af0f090fec"; };
 
   };
 

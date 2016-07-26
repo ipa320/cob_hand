@@ -99,7 +99,7 @@ namespace cob_hand_bridge
     }
 
     const char * getType(){ return "cob_hand_bridge/JointValues"; };
-    const char * getMD5(){ return "8aab4213f33d6f17f952e56b8cad1628"; };
+    const char * getMD5(){ return "56888b501781f63d985056106eff9a9e"; };
 
   };
 
