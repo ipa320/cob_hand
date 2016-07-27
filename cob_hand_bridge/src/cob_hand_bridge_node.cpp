@@ -13,6 +13,7 @@
 #include <ros/ros.h>
 
 #include <boost/thread/mutex.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include <angles/angles.h>
@@ -21,6 +22,8 @@ boost::mutex g_mutex;
 
 cob_hand_bridge::Status::ConstPtr g_status; 
 boost::scoped_ptr<cob_hand_bridge::JointValues> g_command;
+boost::shared_ptr<diagnostic_updater::TimeStampStatus> g_topic_status;
+
 
 ros::Publisher g_js_pub;
 sensor_msgs::JointState g_js;
@@ -32,6 +35,7 @@ ros::Publisher g_command_pub;
 void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     boost::mutex::scoped_lock lock(g_mutex);
     g_status = msg;
+    g_topic_status->tick(msg->stamp);
 
     if(!g_command){
         g_command.reset(new cob_hand_bridge::JointValues());
@@ -72,6 +76,26 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
 
     return true;
 }
+
+void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
+    boost::mutex::scoped_lock lock(g_mutex);
+    
+    if(!g_status){
+        stat.summary(stat.ERROR, "not connected");
+        return;
+    }
+    
+    if(g_status->status == g_status->NOT_INITIALIZED){
+        stat.summary(stat.WARN, "not initialized");
+    }else if(g_status->status & g_status->MASK_ERROR){
+        stat.summary(stat.ERROR, "Bridge has error");
+    }else{
+        stat.summary(stat.OK, "Connected and running");
+    }
+    stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
+    stat.add("sdhx_rc", uint32_t(g_status->rc));
+}
+
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "cob_hand_bridge_node");
@@ -86,6 +110,19 @@ int main(int argc, char* argv[])
         return 1;
     }
     
+    diagnostic_updater::Updater diag_updater;
+    diag_updater.setHardwareID(nh_priv.param("hardware_id", std::string("none")));
+    diag_updater.add("bridge", reportDiagnostics);
+    
+    diagnostic_updater::TimeStampStatusParam param(
+        nh_priv.param("status/min_duration", -1.0),
+        nh_priv.param("status/max_duration", 0.1)
+    );
+    g_topic_status.reset ( new diagnostic_updater::TimeStampStatus(param) );
+    diag_updater.add("connection", boost::bind(&diagnostic_updater::TimeStampStatus::run, g_topic_status, _1));
+    
+    ros::Timer diag_timer = nh.createTimer(ros::Duration(diag_updater.getPeriod()/2.0),boost::bind(&diagnostic_updater::Updater::update, &diag_updater));
+
     g_js_pub = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     
     ros::Subscriber status_sub = nh_i.subscribe("status", 1, statusCallback);
@@ -93,7 +130,7 @@ int main(int argc, char* argv[])
     g_command_pub = nh.advertise<cob_hand_bridge::JointValues>("command", 1);
 
     ros::ServiceServer init_srv = nh_d.advertiseService("init", initCallback);
-    
+
     ros::spin();
     return 0;
 }
