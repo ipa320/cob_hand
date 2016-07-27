@@ -60,8 +60,8 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
         srv.request.port = nh_priv.param<std::string>("sdhx/port", "/dev/ttyACM0");
         srv.request.min_pwm0 = nh_priv.param("sdhx/min_pwm0", 0);
         srv.request.min_pwm1 = nh_priv.param("sdhx/min_pwm1", 0);
-        srv.request.min_pwm0 = nh_priv.param("sdhx/min_pwm0", 0);
-        srv.request.min_pwm1 = nh_priv.param("sdhx/max_pwm1", 0);
+        srv.request.max_pwm0 = nh_priv.param("sdhx/max_pwm0", 0);
+        srv.request.max_pwm1 = nh_priv.param("sdhx/max_pwm1", 0);
 
         if(!g_init_finger_client.call(srv)) return false;
         res.success = srv.response.success;
