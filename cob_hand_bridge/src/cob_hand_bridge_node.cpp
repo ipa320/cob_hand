@@ -94,6 +94,10 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
     stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
     stat.add("sdhx_rc", uint32_t(g_status->rc));
+
+    if(g_status->rc > 0){
+        stat.mergeSummary(stat.ERROR, "SDHx has error");
+    }
 }
 
 int main(int argc, char* argv[])
