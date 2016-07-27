@@ -1,10 +1,11 @@
 <launch>
   <arg name="port"/>
   <arg name="baud" default="57600" />
+  <arg name="check" default="false" />
   <node pkg="rosserial_server" type="serial_node" name="rosserial_server">
       <param name="port" value="$(arg port)" />
       <param name="baud" value="$(arg baud)" />
-      <rosparam>
+      <rosparam if="$(arg check)">
        require:
           publishers: [ status ]
           subscribers: [ command, set_pin, clear_pin ]
