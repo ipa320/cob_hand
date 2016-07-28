@@ -48,14 +48,20 @@ bool isFingerReady_nolock() {
 bool checkAction_nolock(bool deadline_exceeded){
     control_msgs::FollowJointTrajectoryResult result;
     if(g_as->isActive()){
-        if(!isFingerReady_nolock()) {
-            g_as->setAborted();
-        }else if(g_motors_moved && g_motors_stopped) {
+        bool goal_reached = false;
+        if(g_motors_stopped) {
+            goal_reached = true;;
             for(size_t i = 0; i < g_status->joints.position_cdeg.size(); ++i){
                 if(fabs(g_status->joints.position_cdeg[i]-g_command.position_cdeg[i]) > g_goal_tolerance[i]){
+                    goal_reached = false;
                     result.error_code = result.GOAL_TOLERANCE_VIOLATED;
+                    break;
                 }
             }
+        }
+        if(!isFingerReady_nolock()) {
+            g_as->setAborted();
+        }else if(g_motors_stopped && (goal_reached || g_motors_moved)) {
             g_as->setSucceeded(result);
         }else if (deadline_exceeded) {
             result.error_code = result.GOAL_TOLERANCE_VIOLATED;
