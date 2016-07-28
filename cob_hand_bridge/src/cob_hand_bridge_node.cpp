@@ -267,7 +267,7 @@ int main(int argc, char* argv[])
     }
     
     
-    nh_priv.param("sdhx/stopped_velocity",g_stopped_velocity, 0.01);
+    nh_priv.param("sdhx/stopped_velocity",g_stopped_velocity, 0.05);
     if(g_stopped_velocity <= 0.0){
         ROS_ERROR_STREAM("stopped_velocity must be a positive number");
         return 1;
