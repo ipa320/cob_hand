@@ -190,8 +190,10 @@ void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
         }
     }
 
-    ros::Time trajectory_deadline = goal->trajectory.header.stamp + goal->trajectory.points.back().time_from_start + ros::Duration(goal->goal_time_tolerance);
-    if(trajectory_deadline <= ros::Time::now()){
+    ros::Time now = ros::Time::now();
+    ros::Time trajectory_deadline = (goal->trajectory.header.stamp.isZero() ? now : goal->trajectory.header.stamp)
+                                  + goal->trajectory.points.back().time_from_start + ros::Duration(goal->goal_time_tolerance);
+    if(trajectory_deadline <= now){
         result.error_code = result.OLD_HEADER_TIMESTAMP;
         g_as->setAborted(result, "goal is not valid");
         return;
