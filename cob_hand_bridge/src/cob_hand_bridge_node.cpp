@@ -38,6 +38,7 @@ ros::Timer g_command_timer;
 ros::Time g_trajectory_deadline;
 double g_stopped_velocity;
 bool g_motors_stopped;
+bool g_motors_moved;
 std::vector<double> g_goal_tolerance;
 
 bool isFingerReady_nolock() {
@@ -49,13 +50,13 @@ bool checkAction_nolock(bool deadline_exceeded){
     if(g_as->isActive()){
         if(!isFingerReady_nolock()) {
             g_as->setAborted();
-        }else if(g_motors_stopped) {
+        }else if(g_motors_moved && g_motors_stopped) {
             for(size_t i = 0; i < g_status->joints.position_cdeg.size(); ++i){
                 if(fabs(g_status->joints.position_cdeg[i]-g_command.position_cdeg[i]) > g_goal_tolerance[i]){
                     result.error_code = result.GOAL_TOLERANCE_VIOLATED;
                 }
             }
-            g_as->setSucceeded(result, "goal not reached in time");
+            g_as->setSucceeded(result);
         }else if (deadline_exceeded) {
             result.error_code = result.GOAL_TOLERANCE_VIOLATED;
             g_as->setAborted(result, "goal not reached in time");
@@ -80,7 +81,10 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
             if(!first){
                 g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
             }
-            if(fabs(g_js.velocity[i]) > g_stopped_velocity) g_motors_stopped = false;
+            if(fabs(g_js.velocity[i]) > g_stopped_velocity){
+                g_motors_stopped = false;
+        	g_motors_moved = true; 
+            }
             g_js.position[i] = new_pos;
         }
         g_js.header.stamp = msg->stamp;
@@ -212,7 +216,7 @@ void goalCB() {
     g_command = new_command;
     g_trajectory_deadline = trajectory_deadline;
     g_goal_tolerance = goal_tolerance;
-        
+    g_motors_moved = false;    
     g_command_timer.stop();
     g_command_pub.publish(g_command);
     g_command_timer.start();
