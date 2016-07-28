@@ -95,7 +95,9 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
     
     ros::NodeHandle nh_priv("~");
     
-    if(g_status->status == g_status->NOT_INITIALIZED) {
+    if(!g_status) {
+        res.message = "hand is not yet connected";
+    }else if(g_status->status == g_status->NOT_INITIALIZED) {
         lock.unlock();
         cob_hand_bridge::InitFinger srv;
         srv.request.port = nh_priv.param<std::string>("sdhx/port", "/dev/ttyACM0");
