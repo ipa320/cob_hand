@@ -21,35 +21,72 @@
 boost::mutex g_mutex;
 
 cob_hand_bridge::Status::ConstPtr g_status; 
-boost::scoped_ptr<cob_hand_bridge::JointValues> g_command;
+cob_hand_bridge::JointValues g_command;
 boost::shared_ptr<diagnostic_updater::TimeStampStatus> g_topic_status;
-
 
 ros::Publisher g_js_pub;
 sensor_msgs::JointState g_js;
 
 ros::ServiceClient g_init_finger_client;
+ros::ServiceClient g_halt_client;
 
 ros::Publisher g_command_pub;
+typedef actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction> FollowJointTrajectoryActionServer;
+boost::scoped_ptr<FollowJointTrajectoryActionServer> g_as;
+control_msgs::FollowJointTrajectoryGoalConstPtr g_goal;
+ros::Timer g_command_timer;
+ros::Time g_trajectory_deadline;
+double g_stopped_velocity;
+bool g_motors_stopped;
+std::vector<double> g_goal_tolerance;
+
+bool isFingerReady_nolock() {
+    return !g_status || (g_status->status & (g_status->MASK_FINGER_READY | g_status->MASK_ERROR)) != g_status->MASK_FINGER_READY || g_status->rc != 0;
+}
+
+bool checkAction_nolock(bool deadline_exceeded){
+    control_msgs::FollowJointTrajectoryResult result;
+    if(g_as->isActive()){
+        if(!isFingerReady_nolock()) {
+            g_as->setAborted();
+        }else if(g_motors_stopped) {
+            for(size_t i = 0; i < g_status->joints.position_cdeg.size(); ++i){
+                if(fabs(g_status->joints.position_cdeg[i]-g_command.position_cdeg[i]) > g_goal_tolerance[i]){
+                    result.error_code = result.GOAL_TOLERANCE_VIOLATED;
+                }
+            }
+            g_as->setSucceeded(result, "goal not reached in time");
+        }else if (deadline_exceeded) {
+            result.error_code = result.GOAL_TOLERANCE_VIOLATED;
+            g_as->setAborted(result, "goal not reached in time");
+            return false;
+        }
+    }
+    return true;
+}
 
 void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     boost::mutex::scoped_lock lock(g_mutex);
+    double dt = g_js.header.stamp.toSec() - msg->stamp.toSec();
+    bool first = g_status || dt == 0 ;
     g_status = msg;
     g_topic_status->tick(msg->stamp);
 
-    if(!g_command){
-        g_command.reset(new cob_hand_bridge::JointValues());
-        g_command->position_cdeg = msg->joints.position_cdeg;
-    }
-    
+    g_motors_stopped = true;
+
     if(msg->status & msg->MASK_FINGER_READY){
-        g_js.position.resize(msg->joints.position_cdeg.size());
         for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
-            g_js.position[i] = angles::from_degrees(msg->joints.position_cdeg[i]/100.0);
+            double new_pos = angles::from_degrees(msg->joints.position_cdeg[i]/100.0);
+            if(!first){
+                g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
+            }
+            if(fabs(g_js.velocity[i]) > g_stopped_velocity) g_motors_stopped = false;
+            g_js.position[i] = new_pos;
         }
         g_js.header.stamp = msg->stamp;
         g_js_pub.publish(g_js);
     }
+    checkAction_nolock(false);
 }
 
 bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response &res)
@@ -70,6 +107,7 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
         if(g_init_finger_client.waitForExistence(ros::Duration(nh_priv.param("sdhx/connect_timeout", 10)))){
             if(!g_init_finger_client.call(srv)) return false;
             res.success = srv.response.success;
+            if(res.success) g_as->start();
         }else{
             res.message = "init_finger service does not exist";
         }
@@ -98,10 +136,114 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
     stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
     stat.add("sdhx_rc", uint32_t(g_status->rc));
+    stat.add("sdhx_motors_stopped", g_motors_stopped);
 
     if(g_status->rc > 0){
         stat.mergeSummary(stat.ERROR, "SDHx has error");
     }
+}
+
+void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
+    // goal is invalid if goal has more than 2 (or 0) points. If 2 point, the first needs time_from_start to be 0
+    control_msgs::FollowJointTrajectoryResult result;
+    result.error_code = result.INVALID_GOAL;
+    if(goal->trajectory.points.size()!=1 && (goal->trajectory.points.size()!=2 || !goal->trajectory.points[0].time_from_start.isZero() ) ){
+        g_as->setAborted(result, "goal is not valid");
+        return;
+    }
+    if(goal->goal_tolerance.size() != g_command.position_cdeg.size()){
+        g_as->setAborted(result, "Goal tolerance is missing");
+        return;
+    }
+    cob_hand_bridge::JointValues new_command;
+    size_t found = 0;
+
+    for(size_t i=0; i < g_js.name.size(); ++i){
+        for(size_t j=0; j < goal->trajectory.joint_names.size(); ++j){
+            if(g_js.name[i] == goal->trajectory.joint_names[j]){
+                new_command.position_cdeg[i]= goal->trajectory.points.back().positions[j];
+                ++found;
+                break;
+            }
+        }
+    }
+
+    if(found != g_js.name.size()){
+        g_as->setAborted(result, "Joint names mismatch");
+        return;
+    }
+    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), g_stopped_velocity); // assume 1s movement is allowed
+
+    for(size_t i = 0; i < goal->goal_tolerance.size(); ++i){
+        bool missing = true;
+        for(size_t j=0; j < g_js.name.size(); ++j){
+            if(goal->goal_tolerance[i].name == g_js.name[j]){
+                missing = false;
+                if(goal->goal_tolerance[i].position > 0.0){
+                    goal_tolerance[j] = goal->goal_tolerance[i].position; 
+                }
+                break;
+            }
+        }
+        if(missing){
+            g_as->setAborted(result, "Goal tolerance invalid");
+            return;
+        }
+    }
+
+    ros::Time trajectory_deadline = goal->trajectory.header.stamp + goal->trajectory.points.back().time_from_start + ros::Duration(goal->goal_time_tolerance);
+    if(trajectory_deadline <= ros::Time::now()){
+        result.error_code = result.OLD_HEADER_TIMESTAMP;
+        g_as->setAborted(result, "goal is not valid");
+        return;
+    }
+
+    boost::mutex::scoped_lock lock(g_mutex);
+
+    if(!isFingerReady_nolock()) {
+        g_as->setAborted(result, "SDHx is not ready for commands");
+        return;
+    }
+
+    g_command = new_command;
+    g_trajectory_deadline = trajectory_deadline;
+    g_goal_tolerance = goal_tolerance;
+        
+    g_command_timer.stop();
+    g_command_pub.publish(g_command);
+    g_command_timer.start();
+}
+
+void stopTrajectory(){
+    if(g_halt_client.exists()){
+        std_srvs::Trigger srv;
+        if(!g_halt_client.call(srv) || !srv.response.success){
+            ROS_ERROR("Halt service did not succeed");
+        }
+    }else{
+        ROS_ERROR("Halt service is not available");
+    }
+}
+void cancelCB() {
+    boost::mutex::scoped_lock lock(g_mutex);
+    g_command.position_cdeg = g_status->joints.position_cdeg;
+    lock.unlock();
+    
+    stopTrajectory();
+    g_as->setPreempted();
+}
+
+void resendCommand(const ros::TimerEvent &e){
+    boost::mutex::scoped_lock lock(g_mutex);
+    if(g_as->isActive() && e.current_real > g_trajectory_deadline){
+        if(!checkAction_nolock(true)){
+            g_command.position_cdeg = g_status->joints.position_cdeg;
+            lock.unlock();
+            stopTrajectory();
+            lock.lock();
+        }
+    }
+    g_command_pub.publish(g_command);
 }
 
 int main(int argc, char* argv[])
@@ -118,6 +260,20 @@ int main(int argc, char* argv[])
         return 1;
     }
     
+    if(g_command.position_cdeg.size() != g_js.name.size()){
+        ROS_ERROR_STREAM("Number of joints does not match " << g_command.position_cdeg.size());
+        return 1;
+    }
+    
+    
+    nh_priv.param("sdhx/stopped_velocity",g_stopped_velocity, 0.01);
+    if(g_stopped_velocity <= 0.0){
+        ROS_ERROR_STREAM("stopped_velocity must be a positive number");
+        return 1;
+    }
+    g_js.position.resize(g_command.position_cdeg.size());
+    g_js.velocity.resize(g_command.position_cdeg.size());
+
     diagnostic_updater::Updater diag_updater;
     diag_updater.setHardwareID(nh_priv.param("hardware_id", std::string("none")));
     diag_updater.add("bridge", reportDiagnostics);
@@ -130,15 +286,21 @@ int main(int argc, char* argv[])
     diag_updater.add("connection", boost::bind(&diagnostic_updater::TimeStampStatus::run, g_topic_status, _1));
     
     ros::Timer diag_timer = nh.createTimer(ros::Duration(diag_updater.getPeriod()/2.0),boost::bind(&diagnostic_updater::Updater::update, &diag_updater));
+    
+    g_command_timer = nh.createTimer(ros::Duration(nh_priv.param("sdhx/resend_period", 0.1)), resendCommand, false, false);
 
     g_js_pub = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     
     ros::Subscriber status_sub = nh_i.subscribe("status", 1, statusCallback);
     g_init_finger_client = nh_i.serviceClient<cob_hand_bridge::InitFinger>("init_finger");
-    g_command_pub = nh.advertise<cob_hand_bridge::JointValues>("command", 1);
+    g_command_pub = nh_i.advertise<cob_hand_bridge::JointValues>("command", 1);
+    g_halt_client = nh_d.serviceClient<std_srvs::Trigger>("halt");
 
+    g_as.reset(new FollowJointTrajectoryActionServer(ros::NodeHandle("joint_trajectory_controller"), "follow_joint_trajectory", executeCB, false));
+    g_as->registerPreemptCallback(cancelCB);
+    
     ros::ServiceServer init_srv = nh_d.advertiseService("init", initCallback);
-
+    
     ros::spin();
     return 0;
 }
