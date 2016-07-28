@@ -145,7 +145,10 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
 }
 
-void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
+void goalCB() {
+
+    control_msgs::FollowJointTrajectoryGoalConstPtr goal = g_as->acceptNewGoal();
+
     // goal is invalid if goal has more than 2 (or 0) points. If 2 point, the first needs time_from_start to be 0
     control_msgs::FollowJointTrajectoryResult result;
     result.error_code = result.INVALID_GOAL;
@@ -297,8 +300,9 @@ int main(int argc, char* argv[])
     g_command_pub = nh_i.advertise<cob_hand_bridge::JointValues>("command", 1);
     g_halt_client = nh_d.serviceClient<std_srvs::Trigger>("halt");
 
-    g_as.reset(new FollowJointTrajectoryActionServer(ros::NodeHandle("joint_trajectory_controller"), "follow_joint_trajectory", executeCB, false));
+    g_as.reset(new FollowJointTrajectoryActionServer(ros::NodeHandle("joint_trajectory_controller"), "follow_joint_trajectory",false));
     g_as->registerPreemptCallback(cancelCB);
+    g_as->registerGoalCallback(goalCB);
     
     ros::ServiceServer init_srv = nh_d.advertiseService("init", initCallback);
     
