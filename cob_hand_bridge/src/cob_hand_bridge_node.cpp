@@ -160,7 +160,7 @@ void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
     for(size_t i=0; i < g_js.name.size(); ++i){
         for(size_t j=0; j < goal->trajectory.joint_names.size(); ++j){
             if(g_js.name[i] == goal->trajectory.joint_names[j]){
-                new_command.position_cdeg[i]= goal->trajectory.points.back().positions[j];
+                new_command.position_cdeg[i]= angles::to_degrees(goal->trajectory.points.back().positions[j])*100;
                 ++found;
                 break;
             }
@@ -171,7 +171,7 @@ void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
         g_as->setAborted(result, "Joint names mismatch");
         return;
     }
-    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), g_stopped_velocity); // assume 1s movement is allowed
+    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), angles::to_degrees(g_stopped_velocity)*100); // assume 1s movement is allowed
 
     for(size_t i = 0; i < goal->goal_tolerance.size(); ++i){
         bool missing = true;
