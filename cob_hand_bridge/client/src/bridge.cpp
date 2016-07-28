@@ -50,12 +50,13 @@ ros::ServiceServer<Trigger::Request, Trigger::Response> g_srv_halt_finger("halt"
 
 void handleRecover(const Trigger::Request & req, Trigger::Response & res){
     if(g_sdhx) {
-        if((g_status_msg.status & g_status_msg.MASK_ERROR) == 0) {
+        if((g_status_msg.status & g_status_msg.MASK_ERROR) == 0 && g_status_msg.rc == 0) {
             res.success = true;
         }else if(g_sdhx->isInitialized()) {
             g_sdhx.reset();
             res.success = initFinger(g_init_req);
             if(res.success) g_status_msg.status &= ~g_status_msg.MASK_ERROR;
+            g_status_msg.rc = 0;
         }else{
             res.message = "Not initialized";
         }
