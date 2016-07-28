@@ -41,7 +41,7 @@ bool g_motors_stopped;
 std::vector<double> g_goal_tolerance;
 
 bool isFingerReady_nolock() {
-    return !g_status || (g_status->status & (g_status->MASK_FINGER_READY | g_status->MASK_ERROR)) != g_status->MASK_FINGER_READY || g_status->rc != 0;
+    return g_status && (g_status->status & (g_status->MASK_FINGER_READY | g_status->MASK_ERROR)) == g_status->MASK_FINGER_READY && g_status->rc == 0;
 }
 
 bool checkAction_nolock(bool deadline_exceeded){
