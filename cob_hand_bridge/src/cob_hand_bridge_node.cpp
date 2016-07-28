@@ -153,10 +153,7 @@ void executeCB(const control_msgs::FollowJointTrajectoryGoalConstPtr &goal) {
         g_as->setAborted(result, "goal is not valid");
         return;
     }
-    if(goal->goal_tolerance.size() != g_command.position_cdeg.size()){
-        g_as->setAborted(result, "Goal tolerance is missing");
-        return;
-    }
+
     cob_hand_bridge::JointValues new_command;
     size_t found = 0;
 
