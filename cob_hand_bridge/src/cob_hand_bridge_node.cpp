@@ -68,7 +68,7 @@ bool checkAction_nolock(bool deadline_exceeded){
 void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     boost::mutex::scoped_lock lock(g_mutex);
     double dt = g_js.header.stamp.toSec() - msg->stamp.toSec();
-    bool first = g_status || dt == 0 ;
+    bool first = !g_status || dt == 0 ;
     g_status = msg;
     g_topic_status->tick(msg->stamp);
 
