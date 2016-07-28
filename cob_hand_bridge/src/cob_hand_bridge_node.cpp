@@ -67,8 +67,12 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
         srv.request.max_pwm0 = nh_priv.param("sdhx/max_pwm0", 0);
         srv.request.max_pwm1 = nh_priv.param("sdhx/max_pwm1", 0);
 
-        if(!g_init_finger_client.call(srv)) return false;
-        res.success = srv.response.success;
+        if(g_init_finger_client.waitForExistence(ros::Duration(nh_priv.param("sdhx/connect_timeout", 10)))){
+            if(!g_init_finger_client.call(srv)) return false;
+            res.success = srv.response.success;
+        }else{
+            res.message = "init_finger service does not exist";
+        }
     }else{
         res.success = true;
         res.message = "already initialized";
