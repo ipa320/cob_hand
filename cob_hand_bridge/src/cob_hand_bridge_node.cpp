@@ -199,7 +199,17 @@ void goalCB() {
     for(size_t i=0; i < g_js.name.size(); ++i){
         for(size_t j=0; j < goal->trajectory.joint_names.size(); ++j){
             if(g_js.name[i] == goal->trajectory.joint_names[j]){
-                new_command.position_cdeg[i]= angles::to_degrees(goal->trajectory.points.back().positions[j])*100;
+                new_command.position_cdeg[i]= angles::to_degrees(goal->trajectory.points.back().positions[j])*100; // cdeg to rad
+                
+                if(goal->trajectory.points.back().effort.size() >  0){
+                    if(goal->trajectory.points.back().effort.size() ==  new_command.current_100uA.size()){
+                        new_command.current_100uA[i] = goal->trajectory.points.back().effort[j] * 1000.0; // (A -> 100uA)
+                    }else{
+                        g_as->setAborted(result, "Number of effort values  mismatch");
+                        return;
+                    }
+                }
+                
                 ++found;
                 break;
             }
@@ -210,7 +220,7 @@ void goalCB() {
         g_as->setAborted(result, "Joint names mismatch");
         return;
     }
-    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), angles::to_degrees(g_stopped_velocity)*100); // assume 1s movement is allowed
+    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), angles::to_degrees(g_stopped_velocity)*100); // assume 1s movement is allowed, cdeg to rad
 
     for(size_t i = 0; i < goal->goal_tolerance.size(); ++i){
         bool missing = true;
