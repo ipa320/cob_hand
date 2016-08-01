@@ -25,12 +25,15 @@ boost::scoped_ptr<SDHX> g_sdhx;
 using cob_hand_bridge::InitFinger;
 
 InitFinger::Request g_init_req;
+std::string g_port;
 
 bool initFinger(const InitFinger::Request & req){
     if(!g_sdhx){
         g_sdhx.reset(new SDHX);
         if(g_sdhx->init(req.port, req.min_pwm0, req.min_pwm1, req.max_pwm0, req.max_pwm1)){
+            g_port = req.port;
             g_init_req = req;
+            g_init_req.port = g_port.c_str();
             return true;
         }
     }
