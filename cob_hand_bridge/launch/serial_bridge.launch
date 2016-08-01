@@ -1,0 +1,16 @@
+<launch>
+  <arg name="port"/>
+  <arg name="baud" default="57600" />
+  <arg name="check" default="false" />
+  <node pkg="rosserial_server" type="serial_node" name="rosserial_server">
+      <param name="port" value="$(arg port)" />
+      <param name="baud" value="$(arg baud)" />
+      <rosparam if="$(arg check)">
+       require:
+          publishers: [ status ]
+          subscribers: [ command, set_pin, clear_pin ]
+          service_servers: [ init_finger, halt, init_pins, update_pins, set_pwm, recover ]
+      </rosparam>
+  </node>
+  <node pkg="rosserial_python" type="message_info_service.py" name="rosserial_message_info" />
+</launch>
