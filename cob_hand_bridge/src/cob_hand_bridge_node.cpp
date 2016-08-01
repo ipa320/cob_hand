@@ -316,7 +316,8 @@ int main(int argc, char* argv[])
     
     ros::Timer diag_timer = nh.createTimer(ros::Duration(diag_updater.getPeriod()/2.0),boost::bind(&diagnostic_updater::Updater::update, &diag_updater));
     
-    g_command_timer = nh.createTimer(ros::Duration(nh_priv.param("sdhx/resend_period", 0.1)), resendCommand, false, false);
+    double resend_period = nh_priv.param("sdhx/resend_period", 0.1);
+    if(resend_period > 0.0) g_command_timer = nh.createTimer(ros::Duration(resend_period), resendCommand, false, false);
 
     g_js_pub = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     
