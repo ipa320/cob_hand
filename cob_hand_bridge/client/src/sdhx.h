@@ -127,14 +127,15 @@ public:
     bool halt(){
         return initialized && send("s\r\n");
     }
-    /*bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
+    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
         static boost::format command("m %hd,%hd %hd,%hd %hu,%hu\r\n");
         return initialized && send(boost::str(command % p[0] % p[1] % v[0] % v[1] % c[0] % c[1]));
-    }*/
-    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
+    }
+/*    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
         static boost::format command("m %hd,%hd\r\n");
         return initialized && send(boost::str(command % p[0] % p[1]));
     }
+*/
     uint8_t getRC(){
         boost::mutex::scoped_lock lock(data_mutex);
         return rc;
