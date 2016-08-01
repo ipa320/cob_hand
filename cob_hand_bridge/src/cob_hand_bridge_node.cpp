@@ -265,7 +265,14 @@ void cancelCB() {
 
 void resendCommand(const ros::TimerEvent &e){
     boost::mutex::scoped_lock lock(g_mutex);
-    g_command_pub.publish(g_command);
+    if(isFingerReady_nolock()){
+        g_command_pub.publish(g_command);
+    } else {
+        g_command_timer.stop();
+        lock.unlock();
+        callHalt();
+        ROS_WARN("finger is not ready, stopped resend timer");
+    }
 }
 
 int main(int argc, char* argv[])
