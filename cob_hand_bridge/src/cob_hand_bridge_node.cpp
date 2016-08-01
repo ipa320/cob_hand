@@ -35,7 +35,7 @@ typedef actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction>
 boost::scoped_ptr<FollowJointTrajectoryActionServer> g_as;
 control_msgs::FollowJointTrajectoryGoalConstPtr g_goal;
 ros::Timer g_command_timer;
-ros::Time g_trajectory_deadline;
+ros::Timer g_deadline_timer;
 double g_stopped_velocity;
 bool g_motors_stopped;
 bool g_motors_moved;
@@ -155,9 +155,34 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
 }
 
+void callHalt(){
+    if(g_halt_client.exists()){
+        std_srvs::Trigger srv;
+        if(!g_halt_client.call(srv) || !srv.response.success){
+            ROS_ERROR("Halt service did not succeed");
+        }
+    }else{
+        ROS_ERROR("Halt service is not available");
+    }
+}
+
+void handleDeadline(const ros::TimerEvent &){
+    boost::mutex::scoped_lock lock(g_mutex);
+    if(g_as->isActive()){
+        if(!checkAction_nolock(true)){
+            g_command.position_cdeg = g_status->joints.position_cdeg;
+            lock.unlock();
+            callHalt();
+            lock.lock();
+        }
+    }
+} 
+
 void goalCB() {
 
     control_msgs::FollowJointTrajectoryGoalConstPtr goal = g_as->acceptNewGoal();
+    
+    g_deadline_timer.stop();
 
     // goal is invalid if goal has more than 2 (or 0) points. If 2 point, the first needs time_from_start to be 0
     control_msgs::FollowJointTrajectoryResult result;
@@ -220,43 +245,26 @@ void goalCB() {
     }
 
     g_command = new_command;
-    g_trajectory_deadline = trajectory_deadline;
+    
     g_goal_tolerance = goal_tolerance;
     g_motors_moved = false;    
     g_command_timer.stop();
     g_command_pub.publish(g_command);
+    g_deadline_timer = ros::NodeHandle().createTimer(trajectory_deadline-ros::Time::now(), handleDeadline, true, true);
     g_command_timer.start();
 }
 
-void stopTrajectory(){
-    if(g_halt_client.exists()){
-        std_srvs::Trigger srv;
-        if(!g_halt_client.call(srv) || !srv.response.success){
-            ROS_ERROR("Halt service did not succeed");
-        }
-    }else{
-        ROS_ERROR("Halt service is not available");
-    }
-}
 void cancelCB() {
     boost::mutex::scoped_lock lock(g_mutex);
     g_command.position_cdeg = g_status->joints.position_cdeg;
     lock.unlock();
     
-    stopTrajectory();
+    callHalt();
     g_as->setPreempted();
 }
 
 void resendCommand(const ros::TimerEvent &e){
     boost::mutex::scoped_lock lock(g_mutex);
-    if(g_as->isActive() && e.current_real > g_trajectory_deadline){
-        if(!checkAction_nolock(true)){
-            g_command.position_cdeg = g_status->joints.position_cdeg;
-            lock.unlock();
-            stopTrajectory();
-            lock.lock();
-        }
-    }
     g_command_pub.publish(g_command);
 }
 
