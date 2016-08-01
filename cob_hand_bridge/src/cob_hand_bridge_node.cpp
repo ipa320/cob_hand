@@ -21,7 +21,6 @@
 boost::mutex g_mutex;
 
 cob_hand_bridge::Status::ConstPtr g_status; 
-cob_hand_bridge::JointValues g_command;
 boost::shared_ptr<diagnostic_updater::TimeStampStatus> g_topic_status;
 
 ros::Publisher g_js_pub;
@@ -34,6 +33,8 @@ ros::Publisher g_command_pub;
 typedef actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction> FollowJointTrajectoryActionServer;
 boost::scoped_ptr<FollowJointTrajectoryActionServer> g_as;
 control_msgs::FollowJointTrajectoryGoalConstPtr g_goal;
+cob_hand_bridge::JointValues g_command;
+cob_hand_bridge::JointValues g_default_command;
 ros::Timer g_command_timer;
 ros::Timer g_deadline_timer;
 double g_stopped_velocity;
@@ -192,7 +193,7 @@ void goalCB() {
         return;
     }
 
-    cob_hand_bridge::JointValues new_command;
+    cob_hand_bridge::JointValues new_command = g_default_command;
     size_t found = 0;
 
     for(size_t i=0; i < g_js.name.size(); ++i){
@@ -300,6 +301,20 @@ int main(int argc, char* argv[])
         ROS_ERROR_STREAM("stopped_velocity must be a positive number");
         return 1;
     }
+    std::vector<double> default_currents;
+    if(nh_priv.getParam("sdhx/default_currents", default_currents)){
+        if(default_currents.size() !=  g_default_command.current_100uA.size()){
+            ROS_ERROR_STREAM("Number of current values does not match number of joints");
+            return 1;
+        }
+        for(size_t i=0; i< g_default_command.current_100uA.size(); ++i){
+            g_default_command.current_100uA[i] = default_currents[i] * 1000.0; // (A -> 100uA)
+        }
+    }else{
+        g_default_command.current_100uA[0] = 2000;
+        g_default_command.current_100uA[1] = 1000;
+    }
+
     g_js.position.resize(g_command.position_cdeg.size());
     g_js.velocity.resize(g_command.position_cdeg.size());
 
