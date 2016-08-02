@@ -39,7 +39,7 @@ ros::Timer g_command_timer;
 ros::Timer g_deadline_timer;
 double g_stopped_velocity;
 double g_stopped_current;
-bool g_motors_stopped;
+bool g_motion_stopped;
 bool g_control_stopped;
 bool g_motors_moved;
 std::vector<double> g_goal_tolerance;
@@ -52,7 +52,7 @@ bool checkAction_nolock(bool deadline_exceeded){
     control_msgs::FollowJointTrajectoryResult result;
     if(g_as->isActive()){
         bool goal_reached = false;
-        if(g_motors_stopped) {
+        if(g_motion_stopped) {
             goal_reached = true;;
             for(size_t i = 0; i < g_status->joints.position_cdeg.size(); ++i){
                 if(fabs(g_status->joints.position_cdeg[i]-g_command.position_cdeg[i]) > g_goal_tolerance[i]){
@@ -64,7 +64,7 @@ bool checkAction_nolock(bool deadline_exceeded){
         }
         if(!isFingerReady_nolock()) {
             g_as->setAborted();
-        }else if(g_motors_stopped && (goal_reached || g_motors_moved)) {
+        }else if(g_motion_stopped && (goal_reached || g_motors_moved)) {
             g_as->setSucceeded(result);
         }else if (deadline_exceeded) {
             result.error_code = result.GOAL_TOLERANCE_VIOLATED;
@@ -82,7 +82,7 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     g_status = msg;
     g_topic_status->tick(msg->stamp);
 
-    g_motors_stopped = true;
+    g_motion_stopped = true;
     g_control_stopped = true;
 
     if(msg->status & msg->MASK_FINGER_READY){
@@ -92,7 +92,7 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
                 g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
             }
             if(fabs(g_js.velocity[i]) > g_stopped_velocity){
-                g_motors_stopped = false;
+                g_motion_stopped = false;
         	g_motors_moved = true; 
             }
             if(fabs(msg->joints.current_100uA[i]) > g_stopped_current){
@@ -155,7 +155,7 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
     stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
     stat.add("sdhx_rc", uint32_t(g_status->rc));
-    stat.add("sdhx_motors_stopped", g_motors_stopped);
+    stat.add("sdhx_motion_stopped", g_motion_stopped);
     stat.add("sdhx_control_stopped", g_control_stopped);
 
     if(g_status->rc > 0){
