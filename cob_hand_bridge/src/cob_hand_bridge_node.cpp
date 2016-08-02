@@ -336,8 +336,8 @@ int main(int argc, char* argv[])
             g_default_command.current_100uA[i] = default_currents[i] * 1000.0; // (A -> 100uA)
         }
     }else{
-        g_default_command.current_100uA[0] = 2000;
-        g_default_command.current_100uA[1] = 1000;
+        g_default_command.current_100uA[0] = 2120;
+        g_default_command.current_100uA[1] = 1400;
     }
 
     g_default_command.velocity_cgeg[0] = 1000;
