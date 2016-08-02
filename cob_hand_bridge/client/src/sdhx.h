@@ -24,10 +24,16 @@ class SDHX {
             if((a = serial.waitData(boost::chrono::milliseconds(1))) > 0 &&  (r = serial.read(buffer+offset, MAX_LINE-offset)) > 0){
                 char * line = buffer;
                 while(char * extra = strchr(line, '\n')){
-                    tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hd,%hd");
+                    *extra=0;
+                    switch(line[0]){
+                        case 'r': tryParseRC(line); break;
+                        case 'P': tryReadValues(line, pos, "P=%hd,%hd", true); break;
+                        case 'V': tryReadValues(line, vel, "V=%hd,%hd"); break;
+                        case 'C': tryReadValues(line, cur, "C=%hd,%hd"); break;
+                    }
                     line = extra+1;
                 }
-                offset = line-buffer;
+                offset = (buffer + offset + r - line);
                 strncpy(buffer, line, offset);
             }
         }
@@ -127,14 +133,15 @@ public:
     bool halt(){
         return initialized && send("s\r\n");
     }
-    /*bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
-        static boost::format command("m %hd,%hd %hd,%hd %hu,%hu\r\n");
-        return initialized && send(boost::str(command % p[0] % p[1] % v[0] % v[1] % c[0] % c[1]));
-    }*/
     bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
+        static boost::format command("m %hd,%hd %hd,%hd %hd,%hd\r\n");
+        return initialized && send(boost::str(command % p[0] % p[1] % v[0] % v[1] % c[0] % c[1]));
+    }
+/*    bool move(const int16_t (&p)[2], const int16_t (&v)[2], const int16_t (&c)[2]){
         static boost::format command("m %hd,%hd\r\n");
         return initialized && send(boost::str(command % p[0] % p[1]));
     }
+*/
     uint8_t getRC(){
         boost::mutex::scoped_lock lock(data_mutex);
         return rc;

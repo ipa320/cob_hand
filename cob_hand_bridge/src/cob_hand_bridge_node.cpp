@@ -21,7 +21,6 @@
 boost::mutex g_mutex;
 
 cob_hand_bridge::Status::ConstPtr g_status; 
-cob_hand_bridge::JointValues g_command;
 boost::shared_ptr<diagnostic_updater::TimeStampStatus> g_topic_status;
 
 ros::Publisher g_js_pub;
@@ -34,10 +33,14 @@ ros::Publisher g_command_pub;
 typedef actionlib::SimpleActionServer<control_msgs::FollowJointTrajectoryAction> FollowJointTrajectoryActionServer;
 boost::scoped_ptr<FollowJointTrajectoryActionServer> g_as;
 control_msgs::FollowJointTrajectoryGoalConstPtr g_goal;
+cob_hand_bridge::JointValues g_command;
+cob_hand_bridge::JointValues g_default_command;
 ros::Timer g_command_timer;
-ros::Time g_trajectory_deadline;
+ros::Timer g_deadline_timer;
 double g_stopped_velocity;
-bool g_motors_stopped;
+double g_stopped_current;
+bool g_motion_stopped;
+bool g_control_stopped;
 bool g_motors_moved;
 std::vector<double> g_goal_tolerance;
 
@@ -49,7 +52,7 @@ bool checkAction_nolock(bool deadline_exceeded){
     control_msgs::FollowJointTrajectoryResult result;
     if(g_as->isActive()){
         bool goal_reached = false;
-        if(g_motors_stopped) {
+        if(g_motion_stopped) {
             goal_reached = true;;
             for(size_t i = 0; i < g_status->joints.position_cdeg.size(); ++i){
                 if(fabs(g_status->joints.position_cdeg[i]-g_command.position_cdeg[i]) > g_goal_tolerance[i]){
@@ -60,10 +63,13 @@ bool checkAction_nolock(bool deadline_exceeded){
             }
         }
         if(!isFingerReady_nolock()) {
+            g_deadline_timer.stop();
             g_as->setAborted();
-        }else if(g_motors_stopped && (goal_reached || g_motors_moved)) {
+        }else if(g_motion_stopped && (goal_reached || g_motors_moved)) {
+            g_deadline_timer.stop();
             g_as->setSucceeded(result);
         }else if (deadline_exceeded) {
+            g_deadline_timer.stop();
             result.error_code = result.GOAL_TOLERANCE_VIOLATED;
             g_as->setAborted(result, "goal not reached in time");
             return false;
@@ -79,7 +85,8 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     g_status = msg;
     g_topic_status->tick(msg->stamp);
 
-    g_motors_stopped = true;
+    g_motion_stopped = true;
+    g_control_stopped = true;
 
     if(msg->status & msg->MASK_FINGER_READY){
         for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
@@ -88,8 +95,11 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
                 g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
             }
             if(fabs(g_js.velocity[i]) > g_stopped_velocity){
-                g_motors_stopped = false;
+                g_motion_stopped = false;
         	g_motors_moved = true; 
+            }
+            if(fabs(msg->joints.current_100uA[i]) > g_stopped_current){
+                g_control_stopped = false;
             }
             g_js.position[i] = new_pos;
         }
@@ -148,16 +158,42 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     }
     stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
     stat.add("sdhx_rc", uint32_t(g_status->rc));
-    stat.add("sdhx_motors_stopped", g_motors_stopped);
+    stat.add("sdhx_motion_stopped", g_motion_stopped);
+    stat.add("sdhx_control_stopped", g_control_stopped);
 
     if(g_status->rc > 0){
         stat.mergeSummary(stat.ERROR, "SDHx has error");
     }
 }
 
+void callHalt(){
+    if(g_halt_client.exists()){
+        std_srvs::Trigger srv;
+        if(!g_halt_client.call(srv) || !srv.response.success){
+            ROS_ERROR("Halt service did not succeed");
+        }
+    }else{
+        ROS_ERROR("Halt service is not available");
+    }
+}
+
+void handleDeadline(const ros::TimerEvent &){
+    boost::mutex::scoped_lock lock(g_mutex);
+    if(g_as->isActive()){
+        if(!checkAction_nolock(true)){
+            g_command.position_cdeg = g_status->joints.position_cdeg;
+            lock.unlock();
+            callHalt();
+            lock.lock();
+        }
+    }
+} 
+
 void goalCB() {
 
     control_msgs::FollowJointTrajectoryGoalConstPtr goal = g_as->acceptNewGoal();
+    
+    g_deadline_timer.stop();
 
     // goal is invalid if goal has more than 2 (or 0) points. If 2 point, the first needs time_from_start to be 0
     control_msgs::FollowJointTrajectoryResult result;
@@ -167,13 +203,23 @@ void goalCB() {
         return;
     }
 
-    cob_hand_bridge::JointValues new_command;
+    cob_hand_bridge::JointValues new_command = g_default_command;
     size_t found = 0;
 
     for(size_t i=0; i < g_js.name.size(); ++i){
         for(size_t j=0; j < goal->trajectory.joint_names.size(); ++j){
             if(g_js.name[i] == goal->trajectory.joint_names[j]){
-                new_command.position_cdeg[i]= angles::to_degrees(goal->trajectory.points.back().positions[j])*100;
+                new_command.position_cdeg[i]= angles::to_degrees(goal->trajectory.points.back().positions[j])*100; // cdeg to rad
+                
+                if(goal->trajectory.points.back().effort.size() >  0){
+                    if(goal->trajectory.points.back().effort.size() ==  new_command.current_100uA.size()){
+                        new_command.current_100uA[i] = goal->trajectory.points.back().effort[j] * 1000.0; // (A -> 100uA)
+                    }else{
+                        g_as->setAborted(result, "Number of effort values  mismatch");
+                        return;
+                    }
+                }
+                
                 ++found;
                 break;
             }
@@ -184,7 +230,7 @@ void goalCB() {
         g_as->setAborted(result, "Joint names mismatch");
         return;
     }
-    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), angles::to_degrees(g_stopped_velocity)*100); // assume 1s movement is allowed
+    std::vector<double> goal_tolerance(g_command.position_cdeg.size(), angles::to_degrees(g_stopped_velocity)*100); // assume 1s movement is allowed, cdeg to rad
 
     for(size_t i = 0; i < goal->goal_tolerance.size(); ++i){
         bool missing = true;
@@ -220,44 +266,36 @@ void goalCB() {
     }
 
     g_command = new_command;
-    g_trajectory_deadline = trajectory_deadline;
+    
     g_goal_tolerance = goal_tolerance;
     g_motors_moved = false;    
     g_command_timer.stop();
     g_command_pub.publish(g_command);
+    g_deadline_timer.setPeriod(trajectory_deadline-ros::Time::now());
+    g_deadline_timer.start();
     g_command_timer.start();
 }
 
-void stopTrajectory(){
-    if(g_halt_client.exists()){
-        std_srvs::Trigger srv;
-        if(!g_halt_client.call(srv) || !srv.response.success){
-            ROS_ERROR("Halt service did not succeed");
-        }
-    }else{
-        ROS_ERROR("Halt service is not available");
-    }
-}
 void cancelCB() {
     boost::mutex::scoped_lock lock(g_mutex);
     g_command.position_cdeg = g_status->joints.position_cdeg;
+    g_deadline_timer.stop();
     lock.unlock();
     
-    stopTrajectory();
+    callHalt();
     g_as->setPreempted();
 }
 
 void resendCommand(const ros::TimerEvent &e){
     boost::mutex::scoped_lock lock(g_mutex);
-    if(g_as->isActive() && e.current_real > g_trajectory_deadline){
-        if(!checkAction_nolock(true)){
-            g_command.position_cdeg = g_status->joints.position_cdeg;
-            lock.unlock();
-            stopTrajectory();
-            lock.lock();
-        }
+    if(isFingerReady_nolock()){
+        if(g_control_stopped || !g_motion_stopped) g_command_pub.publish(g_command);
+    } else {
+        g_command_timer.stop();
+        lock.unlock();
+        callHalt();
+        ROS_WARN("finger is not ready, stopped resend timer");
     }
-    g_command_pub.publish(g_command);
 }
 
 int main(int argc, char* argv[])
@@ -285,6 +323,31 @@ int main(int argc, char* argv[])
         ROS_ERROR_STREAM("stopped_velocity must be a positive number");
         return 1;
     }
+
+    double stopped_current= nh_priv.param("sdhx/stopped_current", 0.1);
+    if(stopped_current <= 0.0){
+        ROS_ERROR_STREAM("stopped_current must be a positive number");
+        return 1;
+    }
+    g_stopped_current = stopped_current * 1000.0; // (A -> 100uA)
+    
+    std::vector<double> default_currents;
+    if(nh_priv.getParam("sdhx/default_currents", default_currents)){
+        if(default_currents.size() !=  g_default_command.current_100uA.size()){
+            ROS_ERROR_STREAM("Number of current values does not match number of joints");
+            return 1;
+        }
+        for(size_t i=0; i< g_default_command.current_100uA.size(); ++i){
+            g_default_command.current_100uA[i] = default_currents[i] * 1000.0; // (A -> 100uA)
+        }
+    }else{
+        g_default_command.current_100uA[0] = 2120;
+        g_default_command.current_100uA[1] = 1400;
+    }
+
+    g_default_command.velocity_cdeg_s[0] = 1000;
+    g_default_command.velocity_cdeg_s[1] = 1000;
+
     g_js.position.resize(g_command.position_cdeg.size());
     g_js.velocity.resize(g_command.position_cdeg.size());
 
@@ -301,7 +364,10 @@ int main(int argc, char* argv[])
     
     ros::Timer diag_timer = nh.createTimer(ros::Duration(diag_updater.getPeriod()/2.0),boost::bind(&diagnostic_updater::Updater::update, &diag_updater));
     
-    g_command_timer = nh.createTimer(ros::Duration(nh_priv.param("sdhx/resend_period", 0.1)), resendCommand, false, false);
+    double resend_period = nh_priv.param("sdhx/resend_period", 0.1);
+    if(resend_period > 0.0) g_command_timer = nh.createTimer(ros::Duration(resend_period), resendCommand, false, false);
+    
+    g_deadline_timer = nh.createTimer(ros::Duration(1.0), handleDeadline, true, false); // period is not used, will be overwritten
 
     g_js_pub = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     
