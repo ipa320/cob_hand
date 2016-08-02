@@ -47,7 +47,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME}_node src/cob_hand_bridge_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${Boost_LIBRARIES} ${catkin_LIBRARIES})
-add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 install(TARGETS ${PROJECT_NAME}_node
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
