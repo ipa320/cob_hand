@@ -63,10 +63,13 @@ bool checkAction_nolock(bool deadline_exceeded){
             }
         }
         if(!isFingerReady_nolock()) {
+            g_deadline_timer.stop();
             g_as->setAborted();
         }else if(g_motion_stopped && (goal_reached || g_motors_moved)) {
+            g_deadline_timer.stop();
             g_as->setSucceeded(result);
         }else if (deadline_exceeded) {
+            g_deadline_timer.stop();
             result.error_code = result.GOAL_TOLERANCE_VIOLATED;
             g_as->setAborted(result, "goal not reached in time");
             return false;
@@ -268,7 +271,8 @@ void goalCB() {
     g_motors_moved = false;    
     g_command_timer.stop();
     g_command_pub.publish(g_command);
-    g_deadline_timer = ros::NodeHandle().createTimer(trajectory_deadline-ros::Time::now(), handleDeadline, true, true);
+    g_deadline_timer.setPeriod(trajectory_deadline-ros::Time::now());
+    g_deadline_timer.start();
     g_command_timer.start();
 }
 
@@ -361,6 +365,8 @@ int main(int argc, char* argv[])
     
     double resend_period = nh_priv.param("sdhx/resend_period", 0.1);
     if(resend_period > 0.0) g_command_timer = nh.createTimer(ros::Duration(resend_period), resendCommand, false, false);
+    
+    g_deadline_timer = nh.createTimer(ros::Duration(1.0), handleDeadline, true, false); // period is not used, will be overwritten
 
     g_js_pub = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     
