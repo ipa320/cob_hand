@@ -27,7 +27,7 @@ class SDHX {
                     tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hd,%hd");
                     line = extra+1;
                 }
-                offset = line-buffer;
+                offset = (buffer + offset + r - line);
                 strncpy(buffer, line, offset);
             }
         }
