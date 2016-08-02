@@ -38,7 +38,9 @@ cob_hand_bridge::JointValues g_default_command;
 ros::Timer g_command_timer;
 ros::Timer g_deadline_timer;
 double g_stopped_velocity;
+double g_stopped_current;
 bool g_motors_stopped;
+bool g_control_stopped;
 bool g_motors_moved;
 std::vector<double> g_goal_tolerance;
 
@@ -81,6 +83,7 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
     g_topic_status->tick(msg->stamp);
 
     g_motors_stopped = true;
+    g_control_stopped = true;
 
     if(msg->status & msg->MASK_FINGER_READY){
         for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
@@ -91,6 +94,9 @@ void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
             if(fabs(g_js.velocity[i]) > g_stopped_velocity){
                 g_motors_stopped = false;
         	g_motors_moved = true; 
+            }
+            if(fabs(msg->joints.current_100uA[i]) > g_stopped_current){
+                g_control_stopped = false;
             }
             g_js.position[i] = new_pos;
         }
@@ -150,6 +156,7 @@ void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
     stat.add("sdhx_ready", bool(g_status->status & g_status->MASK_FINGER_READY));
     stat.add("sdhx_rc", uint32_t(g_status->rc));
     stat.add("sdhx_motors_stopped", g_motors_stopped);
+    stat.add("sdhx_control_stopped", g_control_stopped);
 
     if(g_status->rc > 0){
         stat.mergeSummary(stat.ERROR, "SDHx has error");
@@ -277,7 +284,7 @@ void cancelCB() {
 void resendCommand(const ros::TimerEvent &e){
     boost::mutex::scoped_lock lock(g_mutex);
     if(isFingerReady_nolock()){
-        g_command_pub.publish(g_command);
+        if(g_control_stopped) g_command_pub.publish(g_command);
     } else {
         g_command_timer.stop();
         lock.unlock();
@@ -311,6 +318,14 @@ int main(int argc, char* argv[])
         ROS_ERROR_STREAM("stopped_velocity must be a positive number");
         return 1;
     }
+
+    double stopped_current= nh_priv.param("sdhx/stopped_current", 0.1);
+    if(stopped_current <= 0.0){
+        ROS_ERROR_STREAM("stopped_current must be a positive number");
+        return 1;
+    }
+    g_stopped_current = stopped_current * 1000.0; // (A -> 100uA)
+    
     std::vector<double> default_currents;
     if(nh_priv.getParam("sdhx/default_currents", default_currents)){
         if(default_currents.size() !=  g_default_command.current_100uA.size()){
