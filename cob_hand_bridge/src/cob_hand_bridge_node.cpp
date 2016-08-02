@@ -279,6 +279,7 @@ void goalCB() {
 void cancelCB() {
     boost::mutex::scoped_lock lock(g_mutex);
     g_command.position_cdeg = g_status->joints.position_cdeg;
+    g_deadline_timer.stop();
     lock.unlock();
     
     callHalt();
