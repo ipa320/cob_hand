@@ -284,7 +284,7 @@ void cancelCB() {
 void resendCommand(const ros::TimerEvent &e){
     boost::mutex::scoped_lock lock(g_mutex);
     if(isFingerReady_nolock()){
-        if(g_control_stopped) g_command_pub.publish(g_command);
+        if(g_control_stopped || !g_motion_stopped) g_command_pub.publish(g_command);
     } else {
         g_command_timer.stop();
         lock.unlock();
