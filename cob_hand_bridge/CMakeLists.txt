@@ -7,6 +7,7 @@ project(cob_hand_bridge)
 find_package(catkin REQUIRED COMPONENTS
   actionlib
   angles
+  control_msgs
   diagnostic_updater
   message_generation
   sensor_msgs
