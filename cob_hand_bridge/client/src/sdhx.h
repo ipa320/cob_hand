@@ -24,7 +24,13 @@ class SDHX {
             if((a = serial.waitData(boost::chrono::milliseconds(1))) > 0 &&  (r = serial.read(buffer+offset, MAX_LINE-offset)) > 0){
                 char * line = buffer;
                 while(char * extra = strchr(line, '\n')){
-                    tryParseRC(line) || tryReadValues(line, pos, "P=%hd,%hd", true) || tryReadValues(line, vel, "V=%hd,%hd") || tryReadValues(line, cur, "C=%hd,%hd");
+                    *extra=0;
+                    switch(line[0]){
+                        case 'r': tryParseRC(line); break;
+                        case 'P': tryReadValues(line, pos, "P=%hd,%hd", true); break;
+                        case 'V': tryReadValues(line, vel, "V=%hd,%hd"); break;
+                        case 'C': tryReadValues(line, cur, "C=%hd,%hd"); break;
+                    }
                     line = extra+1;
                 }
                 offset = (buffer + offset + r - line);
