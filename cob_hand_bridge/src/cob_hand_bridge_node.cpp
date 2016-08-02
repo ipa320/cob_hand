@@ -340,8 +340,8 @@ int main(int argc, char* argv[])
         g_default_command.current_100uA[1] = 1400;
     }
 
-    g_default_command.velocity_cgeg[0] = 1000;
-    g_default_command.velocity_cgeg[1] = 1000;
+    g_default_command.velocity_cdeg_s[0] = 1000;
+    g_default_command.velocity_cdeg_s[1] = 1000;
 
     g_js.position.resize(g_command.position_cdeg.size());
     g_js.velocity.resize(g_command.position_cdeg.size());
