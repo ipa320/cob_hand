@@ -68,7 +68,7 @@ void handleRecover(const Trigger::Request & req, Trigger::Response & res){
 ros::ServiceServer<Trigger::Request, Trigger::Response> g_srv_recover("recover",&handleRecover);
 
 void handleJointCommand(const cob_hand_bridge::JointValues& j){
-    if(g_sdhx) g_sdhx->move(j.position_cdeg, j.velocity_cgeg, j.current_100uA);
+    if(g_sdhx) g_sdhx->move(j.position_cdeg, j.velocity_cdeg_s, j.current_100uA);
 }
 ros::Subscriber<cob_hand_bridge::JointValues> g_sub_command("command", handleJointCommand );
 
@@ -135,7 +135,7 @@ void step(){
     cob_hand_bridge::JointValues &j= g_status_msg.joints;
 
     if(g_sdhx && g_sdhx->isInitialized()){
-        if(g_sdhx->getData(j.position_cdeg, j.velocity_cgeg, j.current_100uA, boost::chrono::seconds(1))) g_status_msg.status |= g_status_msg.MASK_FINGER_READY;
+        if(g_sdhx->getData(j.position_cdeg, j.velocity_cdeg_s, j.current_100uA, boost::chrono::seconds(1))) g_status_msg.status |= g_status_msg.MASK_FINGER_READY;
         else g_status_msg.status |= g_status_msg.MASK_ERROR;
         g_status_msg.rc = g_sdhx->getRC();
     }

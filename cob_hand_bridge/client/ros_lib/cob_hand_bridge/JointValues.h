@@ -13,12 +13,12 @@ namespace cob_hand_bridge
   {
     public:
       int16_t position_cdeg[2];
-      int16_t velocity_cgeg[2];
+      int16_t velocity_cdeg_s[2];
       int16_t current_100uA[2];
 
     JointValues():
       position_cdeg(),
-      velocity_cgeg(),
+      velocity_cdeg_s(),
       current_100uA()
     {
     }
@@ -40,11 +40,11 @@ namespace cob_hand_bridge
       union {
         int16_t real;
         uint16_t base;
-      } u_velocity_cgegi;
-      u_velocity_cgegi.real = this->velocity_cgeg[i];
-      *(outbuffer + offset + 0) = (u_velocity_cgegi.base >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (u_velocity_cgegi.base >> (8 * 1)) & 0xFF;
-      offset += sizeof(this->velocity_cgeg[i]);
+      } u_velocity_cdeg_si;
+      u_velocity_cdeg_si.real = this->velocity_cdeg_s[i];
+      *(outbuffer + offset + 0) = (u_velocity_cdeg_si.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_velocity_cdeg_si.base >> (8 * 1)) & 0xFF;
+      offset += sizeof(this->velocity_cdeg_s[i]);
       }
       for( uint8_t i = 0; i < 2; i++){
       union {
@@ -77,12 +77,12 @@ namespace cob_hand_bridge
       union {
         int16_t real;
         uint16_t base;
-      } u_velocity_cgegi;
-      u_velocity_cgegi.base = 0;
-      u_velocity_cgegi.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
-      u_velocity_cgegi.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
-      this->velocity_cgeg[i] = u_velocity_cgegi.real;
-      offset += sizeof(this->velocity_cgeg[i]);
+      } u_velocity_cdeg_si;
+      u_velocity_cdeg_si.base = 0;
+      u_velocity_cdeg_si.base |= ((uint16_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_velocity_cdeg_si.base |= ((uint16_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->velocity_cdeg_s[i] = u_velocity_cdeg_si.real;
+      offset += sizeof(this->velocity_cdeg_s[i]);
       }
       for( uint8_t i = 0; i < 2; i++){
       union {
@@ -99,7 +99,7 @@ namespace cob_hand_bridge
     }
 
     const char * getType(){ return "cob_hand_bridge/JointValues"; };
-    const char * getMD5(){ return "56888b501781f63d985056106eff9a9e"; };
+    const char * getMD5(){ return "a8168eaf63b3492bbb7dcd4942c4f1c0"; };
 
   };
 
