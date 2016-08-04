@@ -26,6 +26,8 @@ boost::shared_ptr<diagnostic_updater::TimeStampStatus> g_topic_status;
 ros::Publisher g_js_pub;
 sensor_msgs::JointState g_js;
 
+ros::ServiceServer g_init_srv;
+
 ros::ServiceClient g_init_finger_client;
 ros::ServiceClient g_halt_client;
 
@@ -78,37 +80,6 @@ bool checkAction_nolock(bool deadline_exceeded){
     return true;
 }
 
-void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
-    boost::mutex::scoped_lock lock(g_mutex);
-    double dt = g_js.header.stamp.toSec() - msg->stamp.toSec();
-    bool first = !g_status || dt == 0 ;
-    g_status = msg;
-    g_topic_status->tick(msg->stamp);
-
-    g_motion_stopped = true;
-    g_control_stopped = true;
-
-    if(msg->status & msg->MASK_FINGER_READY){
-        for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
-            double new_pos = angles::from_degrees(msg->joints.position_cdeg[i]/100.0);
-            if(!first){
-                g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
-            }
-            if(fabs(g_js.velocity[i]) > g_stopped_velocity){
-                g_motion_stopped = false;
-        	g_motors_moved = true; 
-            }
-            if(fabs(msg->joints.current_100uA[i]) > g_stopped_current){
-                g_control_stopped = false;
-            }
-            g_js.position[i] = new_pos;
-        }
-        g_js.header.stamp = msg->stamp;
-        g_js_pub.publish(g_js);
-    }
-    checkAction_nolock(false);
-}
-
 bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response &res)
 {
     boost::mutex::scoped_lock lock(g_mutex);
@@ -139,6 +110,40 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
     }
 
     return true;
+}
+
+void statusCallback(const cob_hand_bridge::Status::ConstPtr& msg){
+    boost::mutex::scoped_lock lock(g_mutex);
+    double dt = g_js.header.stamp.toSec() - msg->stamp.toSec();
+    bool first = !g_status;
+    bool calc_vel = !first && dt != 0 ;
+    g_status = msg;
+    g_topic_status->tick(msg->stamp);
+
+    g_motion_stopped = true;
+    g_control_stopped = true;
+
+    if(msg->status & msg->MASK_FINGER_READY){
+        for(size_t i=0; i < msg->joints.position_cdeg.size(); ++i){
+            double new_pos = angles::from_degrees(msg->joints.position_cdeg[i]/100.0);
+            if(calc_vel){
+                g_js.velocity[i] = (new_pos - g_js.position[i]) / dt;
+            }
+            if(fabs(g_js.velocity[i]) > g_stopped_velocity){
+                g_motion_stopped = false;
+        	g_motors_moved = true; 
+            }
+            if(fabs(msg->joints.current_100uA[i]) > g_stopped_current){
+                g_control_stopped = false;
+            }
+            g_js.position[i] = new_pos;
+        }
+        g_js.header.stamp = msg->stamp;
+        g_js_pub.publish(g_js);
+    }
+    checkAction_nolock(false);
+    
+    if(first) g_init_srv = ros::NodeHandle("driver").advertiseService("init", initCallback);
 }
 
 void reportDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat){
@@ -379,8 +384,6 @@ int main(int argc, char* argv[])
     g_as.reset(new FollowJointTrajectoryActionServer(ros::NodeHandle("joint_trajectory_controller"), "follow_joint_trajectory",false));
     g_as->registerPreemptCallback(cancelCB);
     g_as->registerGoalCallback(goalCB);
-    
-    ros::ServiceServer init_srv = nh_d.advertiseService("init", initCallback);
     
     ros::spin();
     return 0;
