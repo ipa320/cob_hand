@@ -2,8 +2,8 @@
 Changelog for package cob_hand_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.1 (2016-10-10)
+------------------
 * fix install tags
 * move launch files to bringup
 * start init server after status topic is connected
