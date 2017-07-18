@@ -3,7 +3,7 @@
   <version>0.6.1</version>
   <description>The cob_hand stack includes packages that provide access to the Care-O-bot hand through ROS serial.</description>
 
-  <license>LGPL</license>
+  <license>Apache 2.0</license>
 
   <url type="website">http://ros.org/wiki/cob_hand</url>
   <!-- <url type="bugtracker"></url> -->
