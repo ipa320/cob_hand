@@ -10,7 +10,7 @@
 
   <maintainer email="fmw@ipa.fhg.de">Florian Weisshardt</maintainer>
   <maintainer email="nhg@ipa.fhg.de">Nadia Hammoudeh Garcia</maintainer>
-  <author email="mdl@ipa.fhg.de">Mathias Luedtke</author>
+  <author email="mathias.luedtke@ipa.fraunhofer.de">Mathias Lüdtke</author>
 
   <buildtool_depend>catkin</buildtool_depend>
 
