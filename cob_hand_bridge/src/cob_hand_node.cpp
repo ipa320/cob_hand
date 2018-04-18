@@ -123,11 +123,12 @@ bool init(){
                         nh_priv.param("sdhx/max_pwm0", 0),
                         nh_priv.param("sdhx/max_pwm1", 0)) ){
 
+            g_status->rc = 0;
+            g_status->status &= ~g_status->MASK_ERROR;
             return true;
         }
-        else
-            return false;
     }
+    return false;
 }
 
 bool recover(){
@@ -171,7 +172,7 @@ bool initCallback(std_srvs::Trigger::Request  &req, std_srvs::Trigger::Response 
         g_as->start();
         res.success = true;
         res.message = "finger already initialized, restarting the controller";
-        g_initialized = true;
+        g_initialized = recover();
     }else{
         res.success = true;
         res.message = "already initialized";
