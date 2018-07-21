@@ -2,8 +2,8 @@
 Changelog for package cob_hand_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.4 (2018-07-21)
+------------------
 * update maintainer
 * Merge pull request `#22 <https://github.com/ipa320/cob_hand/issues/22>`_ from ipa-bnm/fix/cob_hand_init
   Reset error in init
