@@ -2,6 +2,11 @@
 Changelog for package cob_hand
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* update maintainer
+* Contributors: fmessmer
+
 0.6.3 (2018-01-07)
 ------------------
 * Merge pull request `#19 <https://github.com/ipa320/cob_hand/issues/19>`_ from ipa320/indigo_release_candidate
