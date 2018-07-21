@@ -4,6 +4,7 @@
   <version>0.6.3</version>
   <description>The cob_hand_bridge package</description>
 
+  <maintainer email="felixmessmer@gmail.com">Felix Messmer</maintainer>
   <maintainer email="fmw@ipa.fhg.de">Florian Weisshardt</maintainer>
   <maintainer email="nhg@ipa.fhg.de">Nadia Hammoudeh Garcia</maintainer>
   <author email="mathias.luedtke@ipa.fraunhofer.de">Mathias Lüdtke</author>
