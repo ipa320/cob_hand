@@ -2,6 +2,11 @@
 Changelog for package cob_hand_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* update pigpio submodule
+* Contributors: fmessmer
+
 0.6.4 (2018-07-21)
 ------------------
 * update maintainer

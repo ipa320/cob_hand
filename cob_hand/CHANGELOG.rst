@@ -2,6 +2,9 @@
 Changelog for package cob_hand
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 0.6.4 (2018-07-21)
 ------------------
 * update maintainer
