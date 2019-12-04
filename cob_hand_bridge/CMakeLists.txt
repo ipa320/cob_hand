@@ -55,6 +55,7 @@ add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 
 add_library(cob_hand_pigpio STATIC client/pigpio/pigpio.c client/pigpio/command.c)
 target_compile_definitions(cob_hand_pigpio PRIVATE DISABLE_SER_CHECK_INITED)
+target_compile_options(cob_hand_pigpio PRIVATE -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-format)
 
 add_executable(cob_hand_node src/cob_hand_node.cpp)
 target_link_libraries(cob_hand_node cob_hand_pigpio ${Boost_LIBRARIES} ${catkin_LIBRARIES})
