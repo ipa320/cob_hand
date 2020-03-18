@@ -2,8 +2,8 @@
 Changelog for package cob_hand_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.7 (2020-03-18)
+------------------
 * Merge pull request `#26 <https://github.com/ipa320/cob_hand/issues/26>`_ from fmessmer/ci_updates
   [travis] ci updates
 * catkin_lint fixes
