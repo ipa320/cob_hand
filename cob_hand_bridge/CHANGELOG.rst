@@ -2,8 +2,8 @@
 Changelog for package cob_hand_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.6.8 (2020-03-25)
+------------------
 * remove -Wno-format flag
 * Contributors: fmessmer
 
